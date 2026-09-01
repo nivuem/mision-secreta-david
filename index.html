@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <title>Misiones Secretas</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -17,80 +16,110 @@
       margin: 0;
       min-height: 100vh;
       font-family: Arial, sans-serif;
-      background: #0b1020;
+      background:
+        radial-gradient(circle at top, #243b55 0%, #141e30 45%, #080b10 100%);
       color: white;
-      padding: 25px;
+      padding: 20px;
     }
 
     .container {
       max-width: 600px;
-      margin: auto;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      padding: 25px 10px;
+    }
+
+    .logo {
+      font-size: 48px;
+      margin-bottom: 10px;
     }
 
     h1 {
-      text-align: center;
-      margin-bottom: 5px;
+      margin: 0;
+      font-size: 32px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
     }
 
     .subtitle {
+      margin-top: 8px;
+      color: #aab7c4;
+      font-size: 15px;
+    }
+
+    #status {
       text-align: center;
-      color: #9ca3af;
-      margin-bottom: 30px;
+      margin: 20px 0;
+      color: #b9c6d3;
     }
 
     .mission {
-      background: #151c32;
-      border: 1px solid #293452;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 18px;
-      padding: 22px;
-      margin-bottom: 18px;
+      padding: 20px;
+      margin-bottom: 15px;
+      transition: 0.2s;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    .mission.completed {
+      opacity: 0.55;
+      border-color: #36d399;
     }
 
     .mission-number {
-      color: #8b5cf6;
+      font-size: 13px;
+      color: #7dd3fc;
       font-weight: bold;
-      margin-bottom: 10px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
     }
 
     .mission-text {
       font-size: 18px;
-      line-height: 1.5;
-      margin-bottom: 20px;
+      line-height: 1.4;
+      margin-bottom: 15px;
     }
 
     button {
       width: 100%;
-      border: none;
-      border-radius: 12px;
       padding: 14px;
+      border: 0;
+      border-radius: 12px;
+      background: #2563eb;
+      color: white;
       font-size: 16px;
       font-weight: bold;
       cursor: pointer;
-      background: #7c3aed;
-      color: white;
     }
 
     button:hover {
-      background: #6d28d9;
+      background: #1d4ed8;
     }
 
-    button.completed {
-      background: #166534;
+    button:disabled {
+      background: #16805b;
       cursor: default;
     }
 
     .error {
-      background: #451a1a;
-      border: 1px solid #7f1d1d;
-      padding: 15px;
-      border-radius: 12px;
-      margin-top: 20px;
+      background: rgba(220, 38, 38, 0.15);
+      border: 1px solid rgba(248, 113, 113, 0.4);
+      border-radius: 15px;
+      padding: 18px;
+      color: #fecaca;
+      line-height: 1.5;
     }
 
-    .loading {
+    .player {
       text-align: center;
-      color: #9ca3af;
-      padding: 30px;
+      margin: 15px 0 25px;
+      font-size: 20px;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -99,315 +128,331 @@
 
 <div class="container">
 
-  <h1>🔐 MISIONES SECRETAS</h1>
+  <header>
+    <div class="logo">🕵️</div>
+    <h1>Misiones Secretas</h1>
+    <div class="subtitle">Cumpleaños · Operación Secreta</div>
+  </header>
 
-  <div class="subtitle" id="playerName">
-    Cargando...
+  <div id="status">
+    Preparando tus misiones...
   </div>
 
-  <div id="missions">
-    <div class="loading">
-      Preparando tus misiones...
-    </div>
-  </div>
+  <div id="player"></div>
 
-  <div id="error"></div>
+  <div id="missions"></div>
 
 </div>
 
 <script>
 
-  // ==========================================
-  // CONFIGURACIÓN SUPABASE
-  // ==========================================
+  // ==============================
+  // CONFIGURACIÓN DE SUPABASE
+  // ==============================
 
   const SUPABASE_URL = "https://hsrxguauuimousgiquni.supabase.co";
 
   const SUPABASE_KEY = "sb_publishable_EGtns7ZM-uYga91abIvglg_ol_T50Ek";
 
-  const supabase = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY
-  );
+  const supabaseClient =
+    window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
 
 
-  // ==========================================
-  // OBTENER CÓDIGO DEL QR
-  // ==========================================
+  // ==============================
+  // ELEMENTOS DE LA PÁGINA
+  // ==============================
+
+  const statusElement = document.getElementById("status");
+  const playerElement = document.getElementById("player");
+  const missionsElement = document.getElementById("missions");
+
+
+  // ==============================
+  // CÓDIGO SECRETO DEL QR
+  // ==============================
 
   const params = new URLSearchParams(window.location.search);
 
   const secretCode = params.get("c");
 
 
-  // ==========================================
-  // ELEMENTOS DE LA PÁGINA
-  // ==========================================
-
-  const missionsContainer =
-    document.getElementById("missions");
-
-  const playerNameElement =
-    document.getElementById("playerName");
-
-  const errorElement =
-    document.getElementById("error");
-
-
-  // ==========================================
-  // MOSTRAR ERROR
-  // ==========================================
-
-  function showError(message) {
-
-    errorElement.innerHTML = `
-      <div class="error">
-        ❌ ${message}
-      </div>
-    `;
-
-  }
-
-
-  // ==========================================
+  // ==============================
   // INICIAR JUEGO
-  // ==========================================
+  // ==============================
 
   async function startGame() {
 
-    if (!secretCode) {
+    try {
 
-      showError(
-        "No se ha encontrado el código del jugador."
-      );
+      if (!secretCode) {
 
-      return;
-    }
+        showError(
+          "No se ha encontrado el código secreto del jugador."
+        );
 
-
-    // ------------------------------------------
-    // CREAR USUARIO ANÓNIMO
-    // ------------------------------------------
-
-    const {
-      data: authData,
-      error: authError
-    } = await supabase.auth.signInAnonymously();
-
-
-    if (authError) {
-
-      showError(
-        "No se ha podido iniciar la sesión: " +
-        authError.message
-      );
-
-      return;
-    }
-
-
-    // ------------------------------------------
-    // ASOCIAR CÓDIGO AL JUGADOR
-    // ------------------------------------------
-
-    const {
-      data: playerData,
-      error: playerError
-    } = await supabase.rpc(
-      "claim_player",
-      {
-        p_secret_code: secretCode
+        return;
       }
-    );
 
 
-    if (playerError) {
+      statusElement.textContent =
+        "Conectando con la central secreta...";
 
-      showError(
-        "Código de jugador no válido: " +
-        playerError.message
+
+      // ------------------------------
+      // LOGIN ANÓNIMO
+      // ------------------------------
+
+      const {
+        data: authData,
+        error: authError
+      } = await supabaseClient.auth.signInAnonymously();
+
+
+      if (authError) {
+        throw authError;
+      }
+
+
+      // ------------------------------
+      // IDENTIFICAR JUGADOR
+      // ------------------------------
+
+      statusElement.textContent =
+        "Identificando agente...";
+
+
+      const {
+        data: playerData,
+        error: playerError
+      } = await supabaseClient.rpc(
+        "claim_player",
+        {
+          p_secret_code: secretCode
+        }
       );
 
-      return;
+
+      if (playerError) {
+        throw playerError;
+      }
+
+
+      if (!playerData || playerData.length === 0) {
+
+        showError(
+          "No se ha encontrado este jugador."
+        );
+
+        return;
+      }
+
+
+      const player = Array.isArray(playerData)
+        ? playerData[0]
+        : playerData;
+
+
+      const playerId = player.id;
+
+
+      playerElement.innerHTML =
+        `🎯 Agente: <strong>${escapeHtml(player.name)}</strong>`;
+
+
+      // ------------------------------
+      // CARGAR MISIONES
+      // ------------------------------
+
+      statusElement.textContent =
+        "Cargando tus misiones secretas...";
+
+
+      const {
+        data: missions,
+        error: missionsError
+      } = await supabaseClient
+        .from("missions")
+        .select("*")
+        .eq("player_id", playerId)
+        .order("mission_number");
+
+
+      if (missionsError) {
+        throw missionsError;
+      }
+
+
+      if (!missions || missions.length === 0) {
+
+        showError(
+          "Este agente todavía no tiene misiones asignadas."
+        );
+
+        return;
+      }
+
+
+      statusElement.textContent =
+        "¡Operación en marcha!";
+
+
+      renderMissions(missions);
+
     }
 
+    catch (error) {
 
-    if (!playerData) {
+      console.error("ERROR:", error);
 
       showError(
-        "No se ha encontrado el jugador."
+        "Ha ocurrido un error al cargar tus misiones.<br><br>" +
+        "<strong>" +
+        escapeHtml(error.message || String(error)) +
+        "</strong>"
       );
-
-      return;
     }
-
-
-    // ------------------------------------------
-    // MOSTRAR NOMBRE
-    // ------------------------------------------
-
-    playerNameElement.textContent =
-      playerData.name;
-
-
-    // ------------------------------------------
-    // CARGAR MISIONES
-    // ------------------------------------------
-
-    await loadMissions(playerData.id);
-
   }
 
 
-  // ==========================================
-  // CARGAR MISIONES
-  // ==========================================
+  // ==============================
+  // MOSTRAR MISIONES
+  // ==============================
 
-  async function loadMissions(playerId) {
+  function renderMissions(missions) {
 
-    const {
-      data: missions,
-      error
-    } = await supabase
-      .from("missions")
-      .select("*")
-      .eq("player_id", playerId)
-      .order("mission_number");
-
-
-    if (error) {
-
-      showError(
-        "No se han podido cargar las misiones: " +
-        error.message
-      );
-
-      return;
-    }
-
-
-    missionsContainer.innerHTML = "";
+    missionsElement.innerHTML = "";
 
 
     missions.forEach(mission => {
 
-      const card =
-        document.createElement("div");
+      const card = document.createElement("div");
 
-      card.className = "mission";
-
-
-      const number =
-        document.createElement("div");
-
-      number.className = "mission-number";
-
-      number.textContent =
-        "MISIÓN #" + mission.mission_number;
+      card.className =
+        "mission" +
+        (mission.completed ? " completed" : "");
 
 
-      const text =
-        document.createElement("div");
+      card.innerHTML = `
 
-      text.className = "mission-text";
+        <div class="mission-number">
+          Misión ${mission.mission_number}
+        </div>
 
-      text.textContent =
-        mission.description;
+        <div class="mission-text">
+          ${escapeHtml(mission.description)}
+        </div>
 
+        <button
+          ${mission.completed ? "disabled" : ""}
+          onclick="completeMission('${mission.id}', this)"
+        >
+          ${
+            mission.completed
+              ? "✓ MISIÓN COMPLETADA"
+              : "MARCAR COMO COMPLETADA"
+          }
+        </button>
 
-      const button =
-        document.createElement("button");
-
-
-      if (mission.completed) {
-
-        button.textContent =
-          "✅ MISIÓN COMPLETADA";
-
-        button.classList.add("completed");
-
-        button.disabled = true;
-
-      } else {
-
-        button.textContent =
-          "MARCAR COMO COMPLETADA";
-
-        button.addEventListener(
-          "click",
-          () => completeMission(
-            mission.id,
-            button
-          )
-        );
-
-      }
+      `;
 
 
-      card.appendChild(number);
-      card.appendChild(text);
-      card.appendChild(button);
-
-      missionsContainer.appendChild(card);
+      missionsElement.appendChild(card);
 
     });
-
   }
 
 
-  // ==========================================
+  // ==============================
   // COMPLETAR MISIÓN
-  // ==========================================
+  // ==============================
 
-  async function completeMission(
-    missionId,
-    button
-  ) {
+  async function completeMission(missionId, button) {
 
     button.disabled = true;
 
-    button.textContent =
-      "Guardando...";
+    button.textContent = "Guardando...";
 
 
-    const {
-      error
-    } = await supabase
-      .from("missions")
-      .update({
-        completed: true,
-        completed_at: new Date().toISOString()
-      })
-      .eq("id", missionId);
+    try {
+
+      const {
+        error
+      } = await supabaseClient
+        .from("missions")
+        .update({
+          completed: true,
+          completed_at: new Date().toISOString()
+        })
+        .eq("id", missionId);
 
 
-    if (error) {
+      if (error) {
+        throw error;
+      }
+
+
+      button.textContent =
+        "✓ MISIÓN COMPLETADA";
+
+
+      button.closest(".mission")
+        .classList.add("completed");
+
+
+    }
+
+    catch (error) {
+
+      console.error("ERROR:", error);
 
       button.disabled = false;
 
       button.textContent =
         "MARCAR COMO COMPLETADA";
 
-      showError(
+
+      alert(
         "No se ha podido guardar la misión: " +
         error.message
       );
-
-      return;
     }
-
-
-    button.textContent =
-      "✅ MISIÓN COMPLETADA";
-
-    button.classList.add("completed");
-
   }
 
 
-  // ==========================================
+  // ==============================
+  // MOSTRAR ERROR
+  // ==============================
+
+  function showError(message) {
+
+    statusElement.innerHTML = `
+      <div class="error">
+        ${message}
+      </div>
+    `;
+  }
+
+
+  // ==============================
+  // SEGURIDAD HTML
+  // ==============================
+
+  function escapeHtml(text) {
+
+    const div = document.createElement("div");
+
+    div.textContent = text;
+
+    return div.innerHTML;
+  }
+
+
+  // ==============================
   // ARRANCAR
-  // ==========================================
+  // ==============================
 
   startGame();
 
