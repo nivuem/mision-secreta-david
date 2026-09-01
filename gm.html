@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Game Master — Misión Secreta</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background:
+        radial-gradient(circle at top, #18233d 0%, #080b13 55%, #050609 100%);
+      color: white;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 24px 18px;
+      text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.25);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(10px);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    header p {
+      margin: 8px 0 0;
+      color: #9da9c4;
+      font-size: 14px;
+    }
+
+    .container {
+      width: min(1100px, 94%);
+      margin: 25px auto 50px;
+    }
+
+    .status {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+    .status strong {
+      color: #62ff9b;
+    }
+
+    .player {
+      margin-bottom: 18px;
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.055);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .player-header {
+      padding: 16px;
+      background: rgba(255,255,255,0.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .player-name {
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .counter {
+      font-size: 13px;
+      color: #aeb9d1;
+      white-space: nowrap;
+    }
+
+    .missions {
+      padding: 10px;
+    }
+
+    .mission {
+      padding: 14px;
+      margin: 8px 0;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.25);
+      border-left: 4px solid #53627e;
+    }
+
+    .mission.completed {
+      border-left-color: #39e878;
+      background: rgba(57,232,120,0.08);
+    }
+
+    .mission-number {
+      font-size: 12px;
+      color: #8996b1;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+    }
+
+    .mission-description {
+      font-size: 15px;
+      line-height: 1.4;
+    }
+
+    .mission-status {
+      margin-top: 8px;
+      font-size: 13px;
+    }
+
+    .done {
+      color: #39e878;
+      font-weight: bold;
+    }
+
+    .pending {
+      color: #8996b1;
+    }
+
+    .empty {
+      color: #65718a;
+      font-size: 14px;
+      padding: 14px;
+    }
+
+    .activity-title {
+      margin-top: 35px;
+      margin-bottom: 12px;
+      font-size: 22px;
+    }
+
+    .activity {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .event {
+      padding: 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .event:last-child {
+      border-bottom: none;
+    }
+
+    .event-name {
+      font-weight: bold;
+      color: #ffffff;
+    }
+
+    .event-mission {
+      margin-top: 5px;
+      color: #b7c1d6;
+      font-size: 14px;
+    }
+
+    .event-time {
+      margin-top: 5px;
+      color: #77839c;
+      font-size: 12px;
+    }
+
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: min(360px, calc(100% - 40px));
+      padding: 16px;
+      border-radius: 14px;
+      background: #141a29;
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+      z-index: 100;
+      transform: translateY(-150px);
+      opacity: 0;
+      transition: 0.3s ease;
+    }
+
+    .notification.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .notification-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .notification-text {
+      color: #c3cbe0;
+      font-size: 14px;
+    }
+
+    @media (max-width: 600px) {
+      header h1 {
+        font-size: 23px;
+      }
+
+      .player-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .player-name {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>🕵️ GAME MASTER</h1>
+    <p>Misión Secreta — Panel de control</p>
+  </header>
+
+  <div class="container">
+
+    <div class="status" id="status">
+      🔄 Cargando panel...
+    </div>
+
+    <div id="players"></div>
+
+    <h2 class="activity-title">📜 Historial de actividad</h2>
+
+    <div class="activity" id="activity">
+      <div class="empty">
+        Todavía no hay misiones completadas.
+      </div>
+    </div>
+
+  </div>
+
+  <div class="notification" id="notification">
+    <div class="notification-title">
+      🎯 ¡MISIÓN COMPLETADA!
+    </div>
+
+    <div class="notification-text" id="notificationText">
+    </div>
+  </div>
+
+
+<script>
+
+const SUPABASE_URL =
+  "https://hsrxguauuimousgiquni.supabase.co";
+
+const SUPABASE_KEY =
+  "sb_publishable_EGtns7ZM-uYga91abIvglg_ol_T50Ek";
+
+const supabaseClient =
+  window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+
+const params =
+  new URLSearchParams(
+    window.location.search
+  );
+
+const masterCode =
+  params.get("m");
+
+
+let dashboardData = [];
+
+
+
+async function init() {
+
+  if (!masterCode) {
+
+    document.getElementById("status").innerHTML =
+      "❌ No se ha encontrado el código de Game Master.";
+
+    return;
+  }
+
+
+  const {
+    data: sessionData
+  } =
+    await supabaseClient.auth.getSession();
+
+
+  if (!sessionData.session) {
+
+    const {
+      error
+    } =
+      await supabaseClient.auth.signInAnonymously();
+
+    if (error) {
+
+      console.error(error);
+
+      document.getElementById("status").innerHTML =
+        "❌ No se ha podido iniciar la sesión.";
+
+      return;
+    }
+  }
+
+
+  await loadDashboard();
+
+  startRealtime();
+
+}
+
+
+
+async function loadDashboard() {
+
+  const {
+    data,
+    error
+  } =
+    await supabaseClient.rpc(
+      "get_gm_dashboard",
+      {
+        p_access_code: masterCode
+      }
+    );
+
+
+  if (error) {
+
+    console.error(error);
+
+    document.getElementById("status").innerHTML =
+      "❌ Código de Game Master incorrecto o error de conexión.";
+
+    return;
+  }
+
+
+  dashboardData = data || [];
+
+  renderDashboard();
+
+}
+
+
+
+function renderDashboard() {
+
+  const playersContainer =
+    document.getElementById("players");
+
+  playersContainer.innerHTML = "";
+
+
+  const players = {};
+
+
+  dashboardData.forEach(row => {
+
+    if (!players[row.player_id]) {
+
+      players[row.player_id] = {
+        name: row.player_name,
+        missions: []
+      };
+
+    }
+
+    if (row.mission_id) {
+
+      players[row.player_id].missions.push(row);
+
+    }
+
+  });
+
+
+  let totalCompleted = 0;
+  let totalMissions = 0;
+
+
+  Object.values(players).forEach(player => {
+
+    totalMissions += player.missions.length;
+
+    totalCompleted +=
+      player.missions.filter(
+        mission => mission.completed
+      ).length;
+
+
+    const playerDiv =
+      document.createElement("div");
+
+    playerDiv.className = "player";
+
+
+    const header =
+      document.createElement("div");
+
+    header.className =
+      "player-header";
+
+
+    const name =
+      document.createElement("div");
+
+    name.className =
+      "player-name";
+
+    name.textContent =
+      "👤 " + player.name;
+
+
+    const counter =
+      document.createElement("div");
+
+    counter.className =
+      "counter";
+
+    counter.textContent =
+      player.missions.filter(
+        mission => mission.completed
+      ).length
+      + " / "
+      + player.missions.length
+      + " completadas";
+
+
+    header.appendChild(name);
+    header.appendChild(counter);
+
+
+    const missionsDiv =
+      document.createElement("div");
+
+    missionsDiv.className =
+      "missions";
+
+
+    if (player.missions.length === 0) {
+
+      missionsDiv.innerHTML =
+        '<div class="empty">⚠️ Todavía no tiene misiones.</div>';
+
+    }
+
+
+    player.missions
+      .sort(
+        (a, b) =>
+          a.mission_number -
+          b.mission_number
+      )
+      .forEach(mission => {
+
+        const missionDiv =
+          document.createElement("div");
+
+        missionDiv.className =
+          "mission";
+
+        if (mission.completed) {
+
+          missionDiv.classList.add(
+            "completed"
+          );
+
+        }
+
+
+        const number =
+          document.createElement("div");
+
+        number.className =
+          "mission-number";
+
+        number.textContent =
+          "Misión "
+          + mission.mission_number;
+
+
+        const description =
+          document.createElement("div");
+
+        description.className =
+          "mission-description";
+
+        description.textContent =
+          mission.description;
+
+
+        const status =
+          document.createElement("div");
+
+        status.className =
+          "mission-status";
+
+
+        if (mission.completed) {
+
+          status.innerHTML =
+            '<span class="done">✓ COMPLETADA</span>'
+            +
+            '<br>'
+            +
+            '<span class="event-time">'
+            +
+            formatDate(
+              mission.completed_at
+            )
+            +
+            '</span>';
+
+        } else {
+
+          status.innerHTML =
+            '<span class="pending">○ Pendiente</span>';
+
+        }
+
+
+        missionDiv.appendChild(number);
+        missionDiv.appendChild(description);
+        missionDiv.appendChild(status);
+
+        missionsDiv.appendChild(
+          missionDiv
+        );
+
+      });
+
+
+    playerDiv.appendChild(header);
+    playerDiv.appendChild(missionsDiv);
+
+    playersContainer.appendChild(
+      playerDiv
+    );
+
+  });
+
+
+  document.getElementById("status").innerHTML =
+    "🟢 <strong>Panel conectado</strong> · "
+    + totalCompleted
+    + " misiones completadas de "
+    + totalMissions;
+
+}
+
+
+
+function formatDate(date) {
+
+  if (!date) {
+    return "";
+  }
+
+  return new Date(date)
+    .toLocaleString(
+      "es-ES",
+      {
+        dateStyle: "short",
+        timeStyle: "medium"
+      }
+    );
+
+}
+
+
+
+function startRealtime() {
+
+  console.log(
+    "Conectando Game Master a Realtime..."
+  );
+
+
+  supabaseClient
+    .channel(
+      "gm-mission-events"
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "mission_events"
+      },
+
+      async payload => {
+
+        console.log(
+          "Nueva misión:",
+          payload.new
+        );
+
+
+        await loadDashboard();
+
+
+        const event =
+          payload.new;
+
+
+        const mission =
+          dashboardData.find(
+            m =>
+              m.mission_id ===
+              event.mission_id
+          );
+
+
+        if (mission) {
+
+          showNotification(
+            mission.player_name,
+            mission.description
+          );
+
+          addActivity(
+            mission.player_name,
+            mission.description,
+            mission.completed_at
+          );
+
+        }
+
+      }
+
+    )
+    .subscribe(
+      status => {
+
+        console.log(
+          "Realtime GM:",
+          status
+        );
+
+      }
+    );
+
+}
+
+
+
+function showNotification(
+  playerName,
+  missionDescription
+) {
+
+  const notification =
+    document.getElementById(
+      "notification"
+    );
+
+  const text =
+    document.getElementById(
+      "notificationText"
+    );
+
+
+  text.innerHTML =
+    "<strong>"
+    + playerName
+    + "</strong> ha completado una misión."
+    +
+    "<br><br>"
+    +
+    missionDescription;
+
+
+  notification.classList.add(
+    "show"
+  );
+
+
+  setTimeout(
+    () => {
+
+      notification.classList.remove(
+        "show"
+      );
+
+    },
+    5000
+  );
+
+}
+
+
+
+function addActivity(
+  playerName,
+  missionDescription,
+  completedAt
+) {
+
+  const activity =
+    document.getElementById(
+      "activity"
+    );
+
+
+  const empty =
+    activity.querySelector(
+      ".empty"
+    );
+
+  if (empty) {
+    empty.remove();
+  }
+
+
+  const event =
+    document.createElement("div");
+
+  event.className =
+    "event";
+
+
+  event.innerHTML =
+    '<div class="event-name">'
+    + "🎯 "
+    + playerName
+    + '</div>'
+    +
+    '<div class="event-mission">'
+    + missionDescription
+    + '</div>'
+    +
+    '<div class="event-time">'
+    + formatDate(completedAt)
+    + '</div>';
+
+
+  activity.prepend(
+    event
+  );
+
+}
+
+
+
+init();
+
+</script>
+
+</body>
+</html>
