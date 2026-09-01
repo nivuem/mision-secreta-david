@@ -150,9 +150,11 @@
   // CONFIGURACIÓN DE SUPABASE
   // ==============================
 
-  const SUPABASE_URL = "https://hsrxguauuimousgiquni.supabase.co";
+  const SUPABASE_URL =
+    "https://hsrxguauuimousgiquni.supabase.co";
 
-  const SUPABASE_KEY = "sb_publishable_EGtns7ZM-uYga91abIvglg_ol_T50Ek";
+  const SUPABASE_KEY =
+    "sb_publishable_EGtns7ZM-uYga91abIvglg_ol_T50Ek";
 
   const supabaseClient =
     window.supabase.createClient(
@@ -162,21 +164,35 @@
 
 
   // ==============================
+  // VARIABLES DEL JUGADOR
+  // ==============================
+
+  let currentPlayerId = null;
+
+
+  // ==============================
   // ELEMENTOS DE LA PÁGINA
   // ==============================
 
-  const statusElement = document.getElementById("status");
-  const playerElement = document.getElementById("player");
-  const missionsElement = document.getElementById("missions");
+  const statusElement =
+    document.getElementById("status");
+
+  const playerElement =
+    document.getElementById("player");
+
+  const missionsElement =
+    document.getElementById("missions");
 
 
   // ==============================
-  // CÓDIGO SECRETO DEL QR
+  // CÓDIGO DEL QR
   // ==============================
 
-  const params = new URLSearchParams(window.location.search);
+  const params =
+    new URLSearchParams(window.location.search);
 
-  const secretCode = params.get("c");
+  const secretCode =
+    params.get("c");
 
 
   // ==============================
@@ -201,12 +217,9 @@
         "Conectando con la central secreta...";
 
 
-      // ------------------------------
       // LOGIN ANÓNIMO
-      // ------------------------------
 
       const {
-        data: authData,
         error: authError
       } = await supabaseClient.auth.signInAnonymously();
 
@@ -216,9 +229,7 @@
       }
 
 
-      // ------------------------------
       // IDENTIFICAR JUGADOR
-      // ------------------------------
 
       statusElement.textContent =
         "Identificando agente...";
@@ -240,7 +251,8 @@
       }
 
 
-      if (!playerData || playerData.length === 0) {
+      if (!playerData ||
+          playerData.length === 0) {
 
         showError(
           "No se ha encontrado este jugador."
@@ -250,21 +262,22 @@
       }
 
 
-      const player = Array.isArray(playerData)
-        ? playerData[0]
-        : playerData;
+      const player =
+        Array.isArray(playerData)
+          ? playerData[0]
+          : playerData;
 
 
-      const playerId = player.id;
+      // GUARDAMOS EL ID DEL JUGADOR
+
+      currentPlayerId = player.id;
 
 
       playerElement.innerHTML =
         `🎯 Agente: <strong>${escapeHtml(player.name)}</strong>`;
 
 
-      // ------------------------------
       // CARGAR MISIONES
-      // ------------------------------
 
       statusElement.textContent =
         "Cargando tus misiones secretas...";
@@ -276,7 +289,7 @@
       } = await supabaseClient
         .from("missions")
         .select("*")
-        .eq("player_id", playerId)
+        .eq("player_id", currentPlayerId)
         .order("mission_number");
 
 
@@ -285,7 +298,8 @@
       }
 
 
-      if (!missions || missions.length === 0) {
+      if (!missions ||
+          missions.length === 0) {
 
         showError(
           "Este agente todavía no tiene misiones asignadas."
@@ -310,7 +324,9 @@
       showError(
         "Ha ocurrido un error al cargar tus misiones.<br><br>" +
         "<strong>" +
-        escapeHtml(error.message || String(error)) +
+        escapeHtml(
+          error.message || String(error)
+        ) +
         "</strong>"
       );
     }
@@ -328,11 +344,15 @@
 
     missions.forEach(mission => {
 
-      const card = document.createElement("div");
+      const card =
+        document.createElement("div");
+
 
       card.className =
         "mission" +
-        (mission.completed ? " completed" : "");
+        (mission.completed
+          ? " completed"
+          : "");
 
 
       card.innerHTML = `
@@ -369,44 +389,73 @@
   // COMPLETAR MISIÓN
   // ==============================
 
-  async function completeMission(missionId, button) {
+  async function completeMission(
+    missionId,
+    button
+  ) {
 
     button.disabled = true;
 
-    button.textContent = "Guardando...";
+    button.textContent =
+      "Guardando...";
 
 
     try {
 
+      // 1. MARCAR MISIÓN COMO COMPLETADA
+
       const {
-        error
+        error: missionError
       } = await supabaseClient
         .from("missions")
         .update({
           completed: true,
-          completed_at: new Date().toISOString()
+          completed_at:
+            new Date().toISOString()
         })
         .eq("id", missionId);
 
 
-      if (error) {
-        throw error;
+      if (missionError) {
+        throw missionError;
       }
 
+
+      // 2. REGISTRAR EL EVENTO
+
+      const {
+        error: eventError
+      } = await supabaseClient
+        .from("mission_events")
+        .insert({
+          mission_id: missionId,
+          player_id: currentPlayerId
+        });
+
+
+      if (eventError) {
+        throw eventError;
+      }
+
+
+      // 3. ACTUALIZAR BOTÓN
 
       button.textContent =
         "✓ MISIÓN COMPLETADA";
 
 
-      button.closest(".mission")
+      button
+        .closest(".mission")
         .classList.add("completed");
-
 
     }
 
     catch (error) {
 
-      console.error("ERROR:", error);
+      console.error(
+        "ERROR:",
+        error
+      );
 
       button.disabled = false;
 
@@ -415,7 +464,7 @@
 
 
       alert(
-        "No se ha podido guardar la misión: " +
+        "No se ha podido guardar la misión:\n\n" +
         error.message
       );
     }
@@ -442,7 +491,8 @@
 
   function escapeHtml(text) {
 
-    const div = document.createElement("div");
+    const div =
+      document.createElement("div");
 
     div.textContent = text;
 
