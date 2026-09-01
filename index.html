@@ -56,6 +56,13 @@
       color: #b9c6d3;
     }
 
+    .player {
+      text-align: center;
+      margin: 15px 0 25px;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
     .mission {
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid rgba(255, 255, 255, 0.15);
@@ -115,23 +122,69 @@
       line-height: 1.5;
     }
 
-    .player {
+    /* ==========================
+       NOTIFICACIÓN
+       ========================== */
+
+    #notification {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translate(-50%, -150%);
+      width: calc(100% - 30px);
+      max-width: 500px;
+      background: rgba(15, 23, 42, 0.97);
+      border: 1px solid rgba(96, 165, 250, 0.6);
+      border-radius: 18px;
+      padding: 18px 20px;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.45);
+      z-index: 9999;
+      transition: transform 0.4s ease;
       text-align: center;
-      margin: 15px 0 25px;
-      font-size: 20px;
+    }
+
+    #notification.show {
+      transform: translate(-50%, 0);
+    }
+
+    .notification-title {
+      font-size: 18px;
       font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    .notification-text {
+      font-size: 16px;
+      color: #dbeafe;
+    }
+
+    .notification-icon {
+      font-size: 30px;
+      margin-bottom: 5px;
     }
   </style>
 </head>
 
 <body>
 
+<div id="notification">
+  <div class="notification-icon">🎯</div>
+  <div class="notification-title">
+    ¡MISIÓN COMPLETADA!
+  </div>
+  <div class="notification-text" id="notificationText"></div>
+</div>
+
 <div class="container">
 
   <header>
     <div class="logo">🕵️</div>
+
     <h1>Misiones Secretas</h1>
-    <div class="subtitle">Cumpleaños · Operación Secreta</div>
+
+    <div class="subtitle">
+      Cumpleaños · Operación Secreta
+    </div>
   </header>
 
   <div id="status">
@@ -143,6 +196,7 @@
   <div id="missions"></div>
 
 </div>
+
 
 <script>
 
@@ -164,14 +218,15 @@
 
 
   // ==============================
-  // VARIABLES DEL JUGADOR
+  // VARIABLES
   // ==============================
 
   let currentPlayerId = null;
+  let currentPlayerName = null;
 
 
   // ==============================
-  // ELEMENTOS DE LA PÁGINA
+  // ELEMENTOS
   // ==============================
 
   const statusElement =
@@ -182,6 +237,12 @@
 
   const missionsElement =
     document.getElementById("missions");
+
+  const notificationElement =
+    document.getElementById("notification");
+
+  const notificationText =
+    document.getElementById("notificationText");
 
 
   // ==============================
@@ -268,9 +329,11 @@
           : playerData;
 
 
-      // GUARDAMOS EL ID DEL JUGADOR
+      currentPlayerId =
+        player.id;
 
-      currentPlayerId = player.id;
+      currentPlayerName =
+        player.name;
 
 
       playerElement.innerHTML =
@@ -314,6 +377,11 @@
 
 
       renderMissions(missions);
+
+
+      // INICIAR NOTIFICACIONES
+
+      startRealtimeNotifications();
 
     }
 
@@ -402,7 +470,7 @@
 
     try {
 
-      // 1. MARCAR MISIÓN COMO COMPLETADA
+      // MARCAR MISIÓN COMO COMPLETADA
 
       const {
         error: missionError
@@ -421,7 +489,7 @@
       }
 
 
-      // 2. REGISTRAR EL EVENTO
+      // REGISTRAR EVENTO
 
       const {
         error: eventError
@@ -437,8 +505,6 @@
         throw eventError;
       }
 
-
-      // 3. ACTUALIZAR BOTÓN
 
       button.textContent =
         "✓ MISIÓN COMPLETADA";
@@ -468,6 +534,130 @@
         error.message
       );
     }
+  }
+
+
+  // ==============================
+  // NOTIFICACIONES EN TIEMPO REAL
+  // ==============================
+
+  function startRealtimeNotifications() {
+
+    console.log(
+      "Conectando a las notificaciones..."
+    );
+
+
+    const channel =
+      supabaseClient
+        .channel("mission-events-global")
+
+
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "mission_events"
+          },
+
+          async (payload) => {
+
+            console.log(
+              "Nuevo evento:",
+              payload
+            );
+
+
+            const event =
+              payload.new;
+
+
+            // Si la misión la ha completado
+            // el propio jugador, NO mostramos
+            // otra notificación.
+
+            if (
+              event.player_id ===
+              currentPlayerId
+            ) {
+              return;
+            }
+
+
+            // Buscar el nombre del jugador
+
+            const {
+              data: player,
+              error
+            } = await supabaseClient
+              .from("players")
+              .select("name")
+              .eq(
+                "id",
+                event.player_id
+              )
+              .single();
+
+
+            if (error || !player) {
+
+              console.error(
+                "No se pudo obtener el jugador:",
+                error
+              );
+
+              return;
+            }
+
+
+            // MOSTRAR NOTIFICACIÓN
+
+            showNotification(
+              player.name
+            );
+
+          }
+        )
+
+
+        .subscribe(
+          (status) => {
+
+            console.log(
+              "Realtime:",
+              status
+            );
+
+          }
+        );
+  }
+
+
+  // ==============================
+  // MOSTRAR NOTIFICACIÓN
+  // ==============================
+
+  function showNotification(
+    playerName
+  ) {
+
+    notificationText.textContent =
+      `${playerName} ha completado una misión`;
+
+
+    notificationElement
+      .classList
+      .add("show");
+
+
+    setTimeout(() => {
+
+      notificationElement
+        .classList
+        .remove("show");
+
+    }, 5000);
   }
 
 
@@ -506,6 +696,10 @@
 
   startGame();
 
+</script>
+
+</body>
+</html>
 </script>
 
 </body>
